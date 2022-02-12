@@ -1,0 +1,156 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<!--
+  Licensed to the Apache Software Foundation (ASF) under one or more
+  contributor license agreements.  See the NOTICE file distributed with
+  this work for additional information regarding copyright ownership.
+  The ASF licenses this file to You under the Apache License, Version 2.0
+  (the "License"); you may not use this file except in compliance with
+  the License.  You may obtain a copy of the License at
+
+       http://www.apache.org/licenses/LICENSE-2.0
+
+  Unless required by applicable law or agreed to in writing, software
+  distributed under the License is distributed on an "AS IS" BASIS,
+  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+  See the License for the specific language governing permissions and
+  limitations under the License.
+-->
+
+<beans xmlns="http://www.springframework.org/schema/beans"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="
+       http://www.springframework.org/schema/beans
+       http://www.springframework.org/schema/beans/spring-beans.xsd">
+    <!--
+        Server configuration.
+    -->
+
+    <!--Data source bean-->
+    <bean class="org.springframework.jdbc.datasource.DriverManagerDataSource" id="dataSource">
+        <property name="driverClassName" value="org.postgresql.Driver"></property>
+        <!-- PUT HERE THE ADDRESS TO AWS RDS POSTGRESQL-->
+        <!--<property name="url" value="jdbc:postgresql://pgw-tpch.cldyjmvs4lgt.us-east-1.rds.amazonaws.com:5432/tpch"/>
+        <property name="username" value="postgres"/>
+        <property name="password" value="pgw-ftj1"/>-->
+    </bean>
+
+    <!--Ignite config-->
+    <bean id="pgw-grid.cfg" class="org.apache.ignite.configuration.IgniteConfiguration">
+        <property name="gridName" value="pgw-grid-server0"/>
+        <property name="clientMode" value="false"/>
+        <property name="peerClassLoadingEnabled" value="true"/>
+
+        <property name="discoverySpi">
+            <bean class="org.apache.ignite.spi.discovery.tcp.TcpDiscoverySpi">
+                <property name="ipFinder">
+                    <bean class="org.apache.ignite.spi.discovery.tcp.ipfinder.multicast.TcpDiscoveryMulticastIpFinder">
+                        <property name="addresses">
+                            <list>
+                                <value>127.0.0.1:47520..47529</value>
+                            </list>
+                        </property>
+                    </bean>
+                </property>
+                <!--<property name="localAddress" value="localhost"/>-->
+            </bean>
+        </property>
+
+        <property name="communicationSpi">
+            <bean class="org.apache.ignite.spi.communication.tcp.TcpCommunicationSpi">
+                <property name="localAddress" value="localhost"/>
+            </bean>
+        </property>
+
+        <property name="dataStorageConfiguration">
+            <bean class="org.apache.ignite.configuration.DataStorageConfiguration">
+                <property name="defaultDataRegionConfiguration">
+                    <bean class="org.apache.ignite.configuration.DataRegionConfiguration">
+                        <property name="persistenceEnabled" value="true"/>
+                    </bean>
+                </property>
+            </bean>
+        </property>
+
+        <property name="failoverSpi">
+            <bean class="org.apache.ignite.spi.failover.always.AlwaysFailoverSpi">
+                <property name="maximumFailoverAttempts" value="5"/>
+            </bean>
+        </property>
+
+        <property name="cacheConfiguration">
+            <list>
+                <bean class="org.apache.ignite.configuration.CacheConfiguration">
+                    <property name="name" value="partCache"></property>
+                    <property name="backups" value="2"/>
+                    <property name="sqlSchema" value="tpch"/>
+                    <!-- Enable readThrough-->
+                    <property name="readThrough" value="false"></property>
+                    <property name="writeThrough" value="false"></property>
+                    <!-- Set cacheStoreFactory-->
+                    <property name="cacheStoreFactory">
+                        <bean class="javax.cache.configuration.FactoryBuilder" factory-method="factoryOf">
+                            <constructor-arg value="ru.pgw.ftj.caches.cachestore.PartCacheStore"></constructor-arg>
+                        </bean>
+                    </property>
+                    <property name="queryEntities">
+                        <list>
+                            <bean class="org.apache.ignite.cache.QueryEntity">
+                                <property name="keyType" value="java.lang.Integer"></property>
+                                <property name="valueType" value="ru.pgw.ftj.caches.Part"></property>
+                                <property name="fields">
+                                    <map>
+                                        <entry key="p_partkey" value="java.lang.Integer"></entry>
+                                        <entry key="p_name" value="java.lang.String"></entry>
+                                    </map>
+                                </property>
+                                <property name="indexes">
+                                    <list>
+                                        <bean class="org.apache.ignite.cache.QueryIndex">
+                                            <constructor-arg value="p_partkey"/>
+                                        </bean>
+                                    </list>
+                                </property>
+                            </bean>
+                        </list>
+                    </property>
+                </bean>
+                <bean class="org.apache.ignite.configuration.CacheConfiguration">
+                    <property name="name" value="partsuppCache"></property>
+                    <property name="backups" value="2"/>
+                    <property name="sqlSchema" value="tpch"/>
+                    <!-- Enable readThrough-->
+                    <property name="readThrough" value="false"></property>
+                    <property name="writeThrough" value="false"></property>
+                    <!-- Set cacheStoreFactory-->
+                    <property name="cacheStoreFactory">
+                        <bean class="javax.cache.configuration.FactoryBuilder" factory-method="factoryOf">
+                            <constructor-arg value="ru.pgw.ftj.caches.cachestore.PartSuppCacheStore"></constructor-arg>
+                        </bean>
+                    </property>
+                    <property name="queryEntities">
+                        <list>
+                            <bean class="org.apache.ignite.cache.QueryEntity">
+                                <property name="keyType" value="java.lang.Integer"></property>
+                                <property name="valueType" value="ru.pgw.ftj.caches.PartSupp"></property>
+                                <property name="fields">
+                                    <map>
+                                        <entry key="ps_partkey" value="java.lang.Integer"></entry>
+                                        <entry key="ps_dummy" value="java.lang.String"></entry>
+                                    </map>
+                                </property>
+                                <property name="indexes">
+                                    <list>
+                                        <bean class="org.apache.ignite.cache.QueryIndex">
+                                            <constructor-arg value="ps_partkey"/>
+                                        </bean>
+                                    </list>
+                                </property>
+                            </bean>
+                        </list>
+                    </property>
+                </bean>
+            </list>
+        </property>
+    </bean>
+</beans>
